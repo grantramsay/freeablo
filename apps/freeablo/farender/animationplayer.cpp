@@ -23,7 +23,7 @@ namespace FARender
             mFrameSequence.push_back(loader.load<int32_t>());
     }
 
-    void AnimationPlayer::save(FASaveGame::GameSaver& saver)
+    void AnimationPlayer::save(FASaveGame::GameSaver& saver) const
     {
         Serial::ScopedCategorySaver cat("AnimationPlayer", saver);
 
@@ -65,7 +65,7 @@ namespace FARender
                 switch (mPlayingAnimType)
                 {
                     case AnimationType::Once:
-                        playAnimation(nullptr, 0, AnimationType::Looped);
+                        stopAnimation();
                         return getCurrentFrame();
                     case AnimationType::FreezeAtEnd:
                         currentFrame = mCurrentAnim->getAnimLength() - 1;
@@ -104,6 +104,8 @@ namespace FARender
     }
 
     void AnimationPlayer::replaceAnimation(FARender::FASpriteGroup* anim) { mCurrentAnim = anim; }
+
+    void AnimationPlayer::stopAnimation() { playAnimation(nullptr, 0, AnimationType::Looped); }
 
     void AnimationPlayer::update() { mTicksSinceAnimStarted++; }
 

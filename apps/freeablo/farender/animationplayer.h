@@ -1,6 +1,4 @@
-
 #pragma once
-
 #include "../faworld/world.h"
 #include "renderer.h"
 
@@ -27,13 +25,16 @@ namespace FARender
 
         AnimationPlayer() {}
         AnimationPlayer(FASaveGame::GameLoader& loader);
-        void save(FASaveGame::GameSaver& saver);
+        void save(FASaveGame::GameSaver& saver) const;
 
         std::pair<FARender::FASpriteGroup*, int32_t> getCurrentFrame();
         AnimationType getCurrentAnimationType() { return mPlayingAnimType; }
 
         void playAnimation(FARender::FASpriteGroup* anim, FAWorld::Tick frameDuration, AnimationType type, int32_t startFrame = 0);
         void playAnimation(FARender::FASpriteGroup* anim, FAWorld::Tick frameDuration, std::vector<int32_t> frameSequence);
+
+        void stopAnimation();
+        bool isPlaying() { return mCurrentAnim != nullptr; }
 
         //!
         //! Simply replaces the currently running animation.

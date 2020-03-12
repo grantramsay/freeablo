@@ -9,7 +9,7 @@ namespace Random
     DummyRng DummyRng::instance;
 
     Rng::~Rng() = default;
-    static_assert(std::mt19937::max() == std::numeric_limits<uint32_t>::max(), "");
+    static_assert(mt19937::max() == std::numeric_limits<uint32_t>::max(), "");
 
     void RngMersenneTwister::load(Serial::Loader& loader)
     {
@@ -20,7 +20,7 @@ namespace Random
         ss >> mRng;
     }
 
-    void RngMersenneTwister::save(Serial::Saver& saver)
+    void RngMersenneTwister::save(Serial::Saver& saver) const
     {
         std::stringstream ss;
         ss.imbue(std::locale::classic());

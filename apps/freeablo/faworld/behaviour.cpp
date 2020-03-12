@@ -42,7 +42,7 @@ namespace FAWorld
 
     BasicMonsterBehaviour::BasicMonsterBehaviour(FASaveGame::GameLoader& loader) { mTicksSinceLastAction = loader.load<Tick>(); }
 
-    void BasicMonsterBehaviour::save(FASaveGame::GameSaver& saver)
+    void BasicMonsterBehaviour::save(FASaveGame::GameSaver& saver) const
     {
         Serial::ScopedCategorySaver cat("BasicMonsterBehaviour", saver);
 
@@ -51,6 +51,9 @@ namespace FAWorld
 
     void BasicMonsterBehaviour::update()
     {
+        if (mActor->mTarget.getType() != Target::Type::None)
+            return;
+
         mTicksSinceLastAction++;
 
         if (!mActor->isDead())
@@ -64,7 +67,15 @@ namespace FAWorld
 
             if (nearest && dist <= std::pow(5, 2)) // we are close enough to engage the player
             {
-                mActor->mTarget = nearest;
+                if (mTicksSinceLastAction >= World::getTicksInPeriod("1"))
+                {
+                    mActor->mTarget = nearest;
+                    mTicksSinceLastAction = 0;
+                }
+                else
+                {
+                    mActor->mTarget = mActor->getPos().current();
+                }
             }
             else if (dist >= std::pow(100, 2)) // just freeze if we're miles away from anyone
             {

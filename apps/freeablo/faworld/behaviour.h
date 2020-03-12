@@ -1,9 +1,6 @@
-
 #pragma once
-
-#include <misc/misc.h>
-
 #include "world.h"
+#include <misc/misc.h>
 
 namespace FASaveGame
 {
@@ -24,7 +21,7 @@ namespace FAWorld
         Behaviour() = default;
 
         virtual const std::string& getTypeId() = 0;
-        virtual void save(FASaveGame::GameSaver& saver) = 0;
+        virtual void save(FASaveGame::GameSaver& saver) const = 0;
         virtual void update() = 0;
 
         virtual ~Behaviour() {}
@@ -44,7 +41,7 @@ namespace FAWorld
         NullBehaviour(FAWorld::Actor* actor) : Behaviour(actor) {}
         NullBehaviour() = default;
 
-        virtual void save(FASaveGame::GameSaver&) override {}
+        virtual void save(FASaveGame::GameSaver&) const override {}
         virtual void update() override {}
 
         virtual ~NullBehaviour() {}
@@ -59,7 +56,7 @@ namespace FAWorld
         BasicMonsterBehaviour(FAWorld::Actor* monster) : Behaviour(monster) {}
         BasicMonsterBehaviour(FASaveGame::GameLoader& loader);
 
-        virtual void save(FASaveGame::GameSaver& saver) override;
+        virtual void save(FASaveGame::GameSaver& saver) const override;
         virtual void update() override;
 
         virtual ~BasicMonsterBehaviour() {}

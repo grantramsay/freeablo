@@ -1,7 +1,6 @@
+#include "dun.h"
 #include <iostream>
 #include <stdio.h>
-
-#include "dun.h"
 
 #include <faio/fafileobject.h>
 #include <serial/loader.h>
@@ -43,7 +42,7 @@ namespace Level
 
     Dun::Dun() {}
 
-    void Dun::save(Serial::Saver& saver)
+    void Dun::save(Serial::Saver& saver) const
     {
         Serial::ScopedCategorySaver cat("Dun", saver);
 

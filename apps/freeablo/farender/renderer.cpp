@@ -5,9 +5,7 @@
 #include "cel/celdecoder.h"
 #include "cel/celfile.h"
 #include "fontinfo.h"
-#include <audio/audio.h>
-#include <boost/format.hpp>
-#include <boost/range/irange.hpp>
+#include <audio/fa_audio.h>
 #include <functional>
 #include <input/inputmanager.h>
 #include <iostream>
@@ -41,15 +39,14 @@ namespace FARender
         return ret;
     }
 
-    std::unique_ptr<PcxFontInfo> Renderer::generateFont(const std::string& pcxPath, const std::string& binPath)
+    std::unique_ptr<PcxFontInfo> Renderer::generateFont(const std::string& pcxPath, const std::string& binPath, const PcxFontInitData& fontInitData)
     {
         std::unique_ptr<PcxFontInfo> ret(new PcxFontInfo());
-        auto tex = mSpriteManager.get(pcxPath + "&trans=0,255,0");
-        ret->initWidths(binPath, tex->getWidth());
+        auto tex = mSpriteManager.get(pcxPath);
+        ret->init(binPath, fontInitData);
         ret->nkFont.userdata.ptr = ret.get();
-        ret->nkFont.height = tex->getHeight() / PcxFontInfo::charCount;
+        ret->nkFont.height = fontInitData.spacingY;
         ret->nkFont.width = &PcxFontInfo::getWidth;
-        mSpriteManager.get(pcxPath);
         ret->nkFont.query = &PcxFontInfo::queryGlyph;
         ret->nkFont.texture = tex->getNkImage().handle;
         return ret;
@@ -181,7 +178,7 @@ namespace FARender
 
     Render::Tile Renderer::getTileByScreenPos(size_t x, size_t y, const FAWorld::Position& screenPos)
     {
-        return Render::getTileByScreenPos(x, y, screenPos.current().x, screenPos.current().y, screenPos.next().x, screenPos.next().y, screenPos.getDist());
+        return Render::getTileByScreenPos(x, y, screenPos.getFractionalPos());
     }
 
     void Renderer::waitUntilDone()
@@ -214,9 +211,7 @@ namespace FARender
             Render::LevelObject obj;
             obj.spriteCacheIndex = object.spriteGroup->getCacheIndex();
             obj.spriteFrame = object.frame;
-            obj.x2 = position.next().x;
-            obj.y2 = position.next().y;
-            obj.dist = position.getDist();
+            obj.fractionalPos = position.getFractionalPos();
             obj.hoverColor = object.hoverColor;
             obj.valid = true;
 
@@ -240,30 +235,13 @@ namespace FARender
 
         Render::clear(0, 0, 0);
 
-        // force preloading of sprites by drawing them offscreen
         for (auto id : spritesToPreload)
-        {
-            Render::SpriteGroup* sprite = mSpriteManager.get(id);
-            for (size_t i = 0; i < sprite->size(); i++)
-                Render::drawSprite(sprite->operator[](i), Render::WIDTH + 10, 0);
-        }
+            mSpriteManager.get(id);
 
         if (state)
         {
             if (state->level)
             {
-                if (mLevelObjects.width() != state->level->width() || mLevelObjects.height() != state->level->height())
-                    mLevelObjects = Render::LevelObjects(state->level->width(), state->level->height());
-
-                for (int32_t x = 0; x < mLevelObjects.width(); x++)
-                {
-                    for (int32_t y = 0; y < mLevelObjects.height(); y++)
-                    {
-                        if (mLevelObjects.get(x, y).size() > 0)
-                            mLevelObjects.get(x, y).clear();
-                    }
-                }
-
                 fill(*state->level, state->mObjects, mLevelObjects);
                 fill(*state->level, state->mItems, mItems);
 
@@ -275,11 +253,7 @@ namespace FARender
                                   &mSpriteManager,
                                   mLevelObjects,
                                   mItems,
-                                  state->mPos.current().x,
-                                  state->mPos.current().y,
-                                  state->mPos.next().x,
-                                  state->mPos.next().y,
-                                  state->mPos.getDist());
+                                  state->mPos.getFractionalPos());
             }
 
             Render::drawGui(state->nuklearData, &mSpriteManager);
@@ -343,12 +317,28 @@ namespace FARender
     {
         mSmallTextFont = generateCelFont("ctrlpan/smaltext.cel", exe.getFontData("smaltext"), 1);
         mBigTGoldFont = generateCelFont("data/bigtgold.cel", exe.getFontData("bigtgold"), 2);
-        for (auto size : {16, 24, 30, 42})
+
+        // Font textures are resized as they are very tall (some GPUs don't support textures larger than 8192x8192).
+        // Resizing the font image also transposes the sub images (LayoutOrder vertical -> horizontal) in this case i.e.
+        //      1     resize ->     1   2   3   4
+        //      2                   5   6   7   8
+        //      3                   9   ...
+        //      ...
+        PcxFontInitData fontInitData[] = {{16, 256, 256, 16, 16, PcxFontInitData::LayoutOrder::horizontal},
+                                          {24, 384, 416, 24, 26, PcxFontInitData::LayoutOrder::horizontal},
+                                          {30, 512, 496, 32, 31, PcxFontInitData::LayoutOrder::horizontal},
+                                          {42, 640, 672, 40, 42, PcxFontInitData::LayoutOrder::horizontal}};
+
+        for (auto& initData : fontInitData)
         {
-            std::string prefix = "ui_art/font" + std::to_string(size);
-            mGoldFont[size] = generateFont(prefix + "g.pcx", prefix + ".bin");
-            if (size != 42)
-                mSilverFont[size] = generateFont(prefix + "s.pcx", prefix + ".bin");
+            std::string prefix = "ui_art/font" + std::to_string(initData.fontSize);
+            std::stringstream postfix;
+            postfix << "&trans=0,255,0";
+            postfix << "&resize=" << initData.textureWidth << "x" << initData.textureHeight;
+            postfix << "&tileSize=" << initData.spacingX << "x" << initData.spacingY;
+            mGoldFont[initData.fontSize] = generateFont(prefix + "g.pcx" + postfix.str(), prefix + ".bin", initData);
+            if (initData.fontSize != 42)
+                mSilverFont[initData.fontSize] = generateFont(prefix + "s.pcx" + postfix.str(), prefix + ".bin", initData);
         }
     }
 

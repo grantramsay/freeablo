@@ -1,13 +1,11 @@
 #include "spritecache.h"
-
 #include <misc/assert.h>
 
-#include <iostream>
-#include <sstream>
-
 #include <cel/celfile.h>
+#include <iostream>
 #include <misc/stringops.h>
 #include <numeric>
+#include <sstream>
 
 namespace FARender
 {
@@ -257,6 +255,9 @@ namespace FARender
 
     void SpriteCache::evict()
     {
+        if (!Render::SpriteGroup::canDeleteIndividualSprites())
+            return;
+
         std::list<uint32_t>::reverse_iterator it;
 
         for (it = mUsedList.rbegin(); it != mUsedList.rend(); it++)
@@ -281,9 +282,17 @@ namespace FARender
     {
         for (std::list<uint32_t>::iterator it = mUsedList.begin(); it != mUsedList.end(); it++)
         {
-            mCache[*it].sprite->destroy();
+            if (Render::SpriteGroup::canDeleteIndividualSprites())
+                mCache[*it].sprite->destroy();
             delete mCache[*it].sprite;
         }
+
+        mCache.clear();
+        mUsedList.clear();
+        mCurrentSize = 0;
+
+        if (!Render::SpriteGroup::canDeleteIndividualSprites())
+            Render::deleteAllSprites();
     }
 
     std::string SpriteCache::getPathForIndex(uint32_t index)

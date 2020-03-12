@@ -1,26 +1,21 @@
 #include "threadmanager.h"
-
-#include <chrono>
-#include <iostream>
-
-#include <input/inputmanager.h>
-
 #include "../farender/renderer.h"
+#include <chrono>
+#include <input/inputmanager.h>
+#include <iostream>
 
 namespace Engine
 {
     ThreadManager* ThreadManager::mThreadManager = NULL;
     ThreadManager* ThreadManager::get() { return mThreadManager; }
 
-    ThreadManager::ThreadManager() : mRenderState(NULL), mAudioManager(50, 100) { mThreadManager = this; }
+    ThreadManager::ThreadManager() : mQueue(100), mRenderState(NULL), mAudioManager(50, 100) { mThreadManager = this; }
 
     void ThreadManager::run()
     {
         const int MAXIMUM_DURATION_IN_MS = 1000;
         Input::InputManager* inputManager = Input::InputManager::get();
         FARender::Renderer* renderer = FARender::Renderer::get();
-
-        Message message;
 
         auto last = std::chrono::system_clock::now();
         size_t numFrames = 0;
@@ -29,8 +24,11 @@ namespace Engine
         {
             mSpritesToPreload.clear();
 
-            while (mQueue.pop(message))
-                handleMessage(message);
+            while (mQueue.front())
+            {
+                handleMessage(*mQueue.front());
+                mQueue.pop();
+            }
 
             inputManager->poll();
 
@@ -38,14 +36,17 @@ namespace Engine
                 break;
 
             auto now = std::chrono::system_clock::now();
-            numFrames++;
+            if (mRenderState)
+                numFrames++;
 
             size_t duration =
                 static_cast<size_t>(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch() - last.time_since_epoch()).count());
 
             if (duration >= MAXIMUM_DURATION_IN_MS)
             {
-                std::cout << "FPS: " << ((float)numFrames) / (((float)duration) / MAXIMUM_DURATION_IN_MS) << std::endl;
+                std::stringstream ss;
+                ss << "(" << ((float)numFrames) / (((float)duration) / MAXIMUM_DURATION_IN_MS) << " FPS)";
+                Render::setWindowTitle(Render::getWindowTitle() + " " + ss.str());
                 numFrames = 0;
                 last = now;
             }
@@ -85,6 +86,8 @@ namespace Engine
         mQueue.push(message);
     }
 
+    bool ThreadManager::isPlayingSound() const { return mAudioManager.isPlayingSound(); }
+
     void ThreadManager::sendRenderState(FARender::RenderState* state)
     {
         Message message;
@@ -100,6 +103,17 @@ namespace Engine
         message.type = ThreadState::PRELOAD_SPRITES;
         message.data.preloadSpriteIds = new std::vector<uint32_t>(sprites);
 
+        mQueue.push(message);
+    }
+
+    void ThreadManager::clearSprites()
+    {
+        auto renderer = FARender::Renderer::get();
+        std::vector<uint32_t> sprites;
+        renderer->getAndClearSpritesNeedingPreloading(sprites);
+
+        Message message;
+        message.type = ThreadState::CLEAR_SPRITES;
         mQueue.push(message);
     }
 
@@ -139,6 +153,19 @@ namespace Engine
             {
                 mSpritesToPreload.insert(mSpritesToPreload.end(), message.data.preloadSpriteIds->begin(), message.data.preloadSpriteIds->end());
                 delete message.data.preloadSpriteIds;
+                break;
+            }
+
+            case ThreadState::CLEAR_SPRITES:
+            {
+                auto renderer = FARender::Renderer::get();
+                renderer->cleanup();
+                mSpritesToPreload.clear();
+                // Clear the current render state, and wait for the next one.
+                // This is to avoid reloading the old level sprites when switching levels.
+                if (mRenderState)
+                    mRenderState->ready = true;
+                mRenderState = nullptr;
                 break;
             }
         }

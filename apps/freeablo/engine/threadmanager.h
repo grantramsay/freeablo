@@ -1,14 +1,12 @@
-
 #pragma once
-
-// this header is included as a workaround for a bug in boost:
-// https://svn.boost.org/trac10/ticket/13497
-#include <boost/next_prior.hpp>
-
-#include <boost/lockfree/spsc_queue.hpp>
+#include "../faaudio/audiomanager.h"
 #include <string>
 
-#include "../faaudio/audiomanager.h"
+// clang-format off
+#include <misc/disablewarn.h>
+#include <rigtorp/SPSCQueue.h>
+#include <misc/enablewarn.h>
+// clang-format on
 
 namespace FARender
 {
@@ -23,7 +21,8 @@ namespace Engine
         PLAY_SOUND,
         STOP_SOUND,
         RENDER_STATE,
-        PRELOAD_SPRITES
+        PRELOAD_SPRITES,
+        CLEAR_SPRITES
     };
 
     struct Message
@@ -48,14 +47,16 @@ namespace Engine
         void playMusic(const std::string& path);
         void playSound(const std::string& path);
         void stopSound();
+        bool isPlayingSound() const;
         void sendRenderState(FARender::RenderState* state);
         void sendSpritesForPreload(std::vector<uint32_t> sprites);
+        void clearSprites();
 
     private:
         void handleMessage(const Message& message);
 
         static ThreadManager* mThreadManager; ///< Singleton instance
-        boost::lockfree::spsc_queue<Message, boost::lockfree::capacity<100>> mQueue;
+        rigtorp::SPSCQueue<Message> mQueue;
         FARender::RenderState* mRenderState;
         FAAudio::AudioManager mAudioManager;
 
